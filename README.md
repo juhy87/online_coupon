@@ -17,6 +17,7 @@ coupon system
    단, 패스워드는 안전한 방법으로 저장한다.
    signin 로그인 API: 입력으로 생성된 계정 (ID, PW)으로 로그인 요청하면 토큰을 발급한다.
    
+8. 10만개 이상 벌크 csv Import 기능
 
 ## 2. 개발 환경
 
@@ -53,7 +54,6 @@ compileOnly 'org.projectlombok:lombok'
 
 ## 빌드 및 실행 방법
 
-
 #### Intellij에서 아래의 순서로 실행
 ```
 1. Sync gradle
@@ -61,37 +61,56 @@ compileOnly 'org.projectlombok:lombok'
 ```
 
 
-## 문제 해결 전략
+### 문제해결 전략
+
 
 ### 서비스 실행 순서
-
 1. 회원가입 
    - userId, password 입력
+    > create data in User Table 
 
      <br/>
 2. 로그인
    - 회원가입한 userId, password 입력 후 token을 받음
    - userId, password가 잘못된 경우 (status : 400 bad request)
+   > User 확인후 token 발행
+   >> 토큰생성 및 header check를 위해 (spring-boot-security, jwt 사용)
 
      <br/>
 3. 쿠폰생성
    - 쿠폰생성 갯수, 만료일(year, month, day) 를 받는다.
-
+   > create data in Coupon Table
+   >> coupon Status 는 NOTYETUSED
+   
      <br/>
 4. 쿠폰 발급
    - 만료일이 오늘날짜를 포함한 이후의 쿠폰을 랜덤으로 한개 발급받는다.
+   > select random data in Coupon Table
+   >> coupon Status 는 USED
+   > create data in UserCoupon Table
 
      <br/>
 5. 쿠폰 List 조회
    - 사용자가 발급받은 쿠폰 List를 조회한다. (쿠폰코드, 만기일)
-
-        <br/>
+   > select data in UserCoupon & Coupon Table
+   
+    <br/>
 6. 쿠폰 발급 취소
    - 발급받은 쿠폰을 취소한다.
-   
+    > delete data in UserCoupon Table
+    > select data in Coupon Table
+    >> update coupon Status  NOTYETUSED
+
     <br/>
 7. 오늘 만료일자 쿠폰 List 조회
    - 발급받은 쿠폰중 만료일자가 금일인 쿠폰 List를 조회한다.
+     > select data in UserCoupon & Coupon Table (expiredDate is Today)   
+
+<br/><br/>
+
+8. 10만개 이상 벌크 csv import  
+    - 쿠폰 데이터(code, 만료일) (위치 : resource/test.csv) bulk create
+   > create data in Coupon Table (1000개씩) *아래 설명 추가
 
 <br/><br/>
 
@@ -292,9 +311,13 @@ Column>
 - 토큰은 userId로 생성
 - token으로 userId 추출 
 
-### application.properties  
-- jwt.secret : token 키 (토큰은 userid 와 secret key로 생성)
+#### application.properties  
+> token 키 ((토큰은 userid 와 secret key로 생성))
+>> jwt.secret : slqkCjalfWjwt 
 
+> UploadFileSize
+>> spring.servlet.multipart.maxFileSize=10MB
+>> spring.servlet.multipart.maxRequestSize=10MB
 ```java
 @Value("${jwt.secret}")
     private String SECRET_KEY;
@@ -340,6 +363,132 @@ Column>
         return (userId.equals(user.getUserId()) && !isTokenExpired(token));
     }
 ```
+#### bulk csv file import
+#### 1. application.properties 설정 : 대용량이기 때문에 size를 10MB로 늘림
+> Size 설정
+>> spring.servlet.multipart.maxFileSize=10MB
+>> spring.servlet.multipart.maxRequestSize=10MB
+
+#### 2. list가 10만개 이상시 out of memory exception 발생
+##### thread관리 : ExecutorService
+##### Task : CouponSaveTask(string parsing 및 저장)
+##### memory 방지 : list를 1000개씩 나눠서 Task에서 저장, 이후 clear  
+
+thread 관리는 ExecutorService의 Executors.newCachedThreadPool 사용
+1000 건씩 최대 5개의 thread를 생성하고, readline으로 읽은 string은 task(CouponSaveTask)에서 parsing 및 저장
+list는 clear해서 out of memory 방지
+
+```java
+
+    private static int maxThreadCnt = 5; //최대 쓰레드 수
+
+    private static int inPutRowCnt = 1000; //쓰레드별 입력행수
+    
+    //쓰레드 그룹을 컨트롤 할 서비스 생성
+    private static ExecutorService ex = Executors.newCachedThreadPool(new ThreadFactory(){
+        @Override
+        public Thread newThread(Runnable r){
+            return new Thread(r);
+        }
+    });
+
+    @Override
+    public void createCoupons(MultipartFile file) {
+        BufferedReader br = null;
+        String line;
+        int rowcount = 0; //max : 21억
+        try {
+            br = new BufferedReader(new InputStreamReader((FileInputStream)(file.getInputStream()), "euc-kr"));
+            ArrayList<String> list = new ArrayList<String>();
+            while ((line = br.readLine()) != null) {
+                rowcount++;
+                list.add(line);
+                if (rowcount % inPutRowCnt == 0) {
+                    Runnable r = new CouponSaveTask(couponRepository, (ArrayList<String>)(list.clone()));
+                    saveThreadManage(r);
+                    list.clear();
+                }
+
+            }
+
+            //미처리 된 데이터에 대해 처리
+            if(list.isEmpty()){
+                System.out.println("파일 처리 완료 ");
+            }else{
+                Runnable r = new CouponSaveTask(couponRepository, (ArrayList<String>) list.clone());
+                r.run();
+            }
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    //쓰레드 관리를 위한 쓰레드 관리함수
+    private static void saveThreadManage(Runnable r) {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+
+        //활성중인 쓰레드의 개수가 최대 쓰레드 개수보다 작을 경우 EXECUTOR사용
+        if(t.activeCount() < maxThreadCnt  && threadState){
+            System.out.println("Active Thread count is : "+t.activeCount());
+            ex.execute(t);
+        }else{
+            //최대 쓰레드 개수에 도달 시 executor에게 작업완료 후 종료명령
+            if(ex.isTerminated()){
+                //활성 쓰레드가 모두 종료되었을 경우 새 Executor 할당 후 실행
+                threadState = true;
+                ex = Executors.newCachedThreadPool(new ThreadFactory(){
+                    @Override
+                    public Thread newThread(Runnable r){
+                        return new Thread(r);
+                    }
+                });
+                ex.execute(t);
+            }else{
+                if(threadState){  //쓰레드 종료 명령이 호출되지 않은 경우만 수행
+                    threadState = false;
+                    System.out.println("Thread group Shutdown");
+                    ex.shutdown();
+                }
+                t.run(); //쓰레드 종료 명령이 완료될 때까진 메인 클래스가 직접수행
+            }
+        }
+    }
+    
+
+```
+```java
+@AllArgsConstructor
+public class CouponSaveTask implements Runnable{
+
+    CouponRepository couponRepository = null;
+
+    ArrayList<String> couponCSVInfoList = null;
+
+    @Override
+    public void run() {
+        List<Coupon> couponList = couponCSVInfoList.stream().map(s->{
+            String[] strArr = s.split(",");
+            return new Coupon(strArr[0], CouponStatus.NOTYETUSED, LocalDate.parse(strArr[1]) );
+        }).collect(Collectors.toList());
+
+        couponRepository.saveAll(couponList);
+        System.out.println("쿠폰 저장 : " + couponList.size() + ", " + Thread.currentThread().getName());
+    }
+}
+```
+
 ### Exception
 
 #### APIExceptionHandler
@@ -397,7 +546,7 @@ public enum ApiError {
 
 #### 1-2. API의 request시 header에 context-type 정보를 입력
 - key : Content-Type
-- value : application/json
+- value : application/json (csv file upload 시 : multipart/form-data)
 
 #### 1-3. Controller에 @RequestBody annotaiton 사용
 - API 실행시 RequestBody에 json 형태로 값을 입력.
@@ -430,33 +579,6 @@ public enum ApiError {
 }
 ```
 
-### 1. 회원가입 API
-
-- URL : /signin
-- Post 방식
-- input : RequestBody
-```json
-{
-    "userId" : "kakao5",
-    "password" : "password1"
-}
-```
-- Success response
-    - status code: 200
-```json
-{
-  "result": "SUCCESS"
-}
-```
-- 중복 ID를 입력한경우
-    - status code: 400
-- Error response
-```json
-{
-  "description": "Id is duplicated.",
-  "code": "E002"
-}
-```
 
 ### 2. 로그인 API
 
@@ -638,6 +760,23 @@ public enum ApiError {
   }
 ]
 ```
+
+
+### 8. csv 10만건 bulk import API
+
+- URL : /uploadCoupon
+- Post 방식
+- input : RequestBody
+
+form data
+```json
+{
+    "file" : {{csv 파일}}
+    
+}
+```
+- Success response
+    - status code: 200
 
 ## Test 코드  결과
 

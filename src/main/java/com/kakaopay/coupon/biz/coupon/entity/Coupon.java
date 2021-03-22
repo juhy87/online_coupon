@@ -37,9 +37,14 @@ public class Coupon {
         this.status = status;
         this.expiredDate = expiredDate;
     }
+    public Coupon(String code, CouponStatus status, LocalDate expiredDate) {
+
+        this.code = code;
+        this.status = status;
+        this.expiredDate = expiredDate;
+    }
 
     public Coupon(CouponStatus status, int year, int month, int day) {
-        this.id = id;
         String code01 = RandomStringUtils.random(5, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFHIJKLMNOPSRQTUVWXYZ");
         String code02 = RandomStringUtils.random(6, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFHIJKLMNOPSRQTUVWXYZ");
         String code03 = RandomStringUtils.random(8, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFHIJKLMNOPSRQTUVWXYZ");
