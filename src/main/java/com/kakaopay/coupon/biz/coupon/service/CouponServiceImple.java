@@ -1,11 +1,10 @@
 package com.kakaopay.coupon.biz.coupon.service;
 
 import com.kakaopay.coupon.biz.constant.CouponStatus;
-import com.kakaopay.coupon.biz.coupon.Task.CouponSaveTask;
+import com.kakaopay.coupon.biz.coupon.task.CouponSaveTask;
 import com.kakaopay.coupon.biz.coupon.entity.Coupon;
 import com.kakaopay.coupon.biz.coupon.repository.CouponRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 

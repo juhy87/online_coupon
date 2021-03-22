@@ -57,7 +57,7 @@ compileOnly 'org.projectlombok:lombok'
 #### Intellij에서 아래의 순서로 실행
 ```
 1. Sync gradle
-2. Run Application
+2. Run CouponApplication
 ```
 
 
