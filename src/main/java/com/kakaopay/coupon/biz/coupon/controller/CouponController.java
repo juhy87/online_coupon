@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.Errors;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
 import java.time.LocalDate;
@@ -84,5 +85,16 @@ public class CouponController {
         userCouponService.cancelCoupone(userId, cancelCouponRequest.getCode());
         return ResponseEntity.ok(new CancelResponse(ResponseStatus.SUCCESS));
 
+    }
+
+    @PostMapping(value ="/uploadCoupon")
+    public Object uploadCoupon(@RequestParam("file") MultipartFile files){
+
+        if(files == null || files.isEmpty()){
+            return ResponseEntity.badRequest().build();
+        }
+        couponService.createCoupons(files);
+
+        return ResponseEntity.ok(new CreateResponse(ResponseStatus.SUCCESS));
     }
 }
