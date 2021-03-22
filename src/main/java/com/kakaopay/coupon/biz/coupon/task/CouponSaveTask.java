@@ -1,10 +1,9 @@
-package com.kakaopay.coupon.biz.coupon.Task;
+package com.kakaopay.coupon.biz.coupon.task;
 
 import com.kakaopay.coupon.biz.constant.CouponStatus;
 import com.kakaopay.coupon.biz.coupon.entity.Coupon;
 import com.kakaopay.coupon.biz.coupon.repository.CouponRepository;
 import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
