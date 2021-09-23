@@ -32,7 +32,7 @@ public class SecurityJavaConfig extends WebSecurityConfigurerAdapter {
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
                     .authorizeRequests()
-                        .antMatchers("/**/signin", "/**/auth").permitAll()
+                        .antMatchers("/**/signin", "/**/auth", "/**/swagger-ui**", "/**/v2/**").permitAll()
                         .anyRequest().hasRole("USER")
                 .and()
                     .addFilterBefore( jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
