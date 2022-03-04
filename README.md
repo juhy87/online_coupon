@@ -1,7 +1,7 @@
-# kakaopay_coupon
+# online pay_coupon
 coupon system
 # Project
-카카오페이 서버개발 사전과제 2번
+online pay 서버개발 
 
 ## 1. 목적
 1. 랜덤한 코드의 쿠폰을 N개 생성하여 데이터베이스에 보관하는 API를 구현하세요.
